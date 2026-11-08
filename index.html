@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dom nad Jeziorem Mietkowskim | Borzygniew</title>
+    <meta name="description" content="Ekskluzywny dom przy ul. Słonecznej 13 w Borzygniewie, z ogrodem, tarasem, szklarnią i dostępem do jeziora Mietkowskiego." />
+    <style>
+      :root { --bg:#f6f3ee; --panel:#fff; --primary:#2d4d3d; --primary-2:#587d67; --accent:#c89a5d; --text:#1d1d1d; --muted:#5e5e5e; --line:#e7e0d8; --shadow:0 18px 40px rgba(0,0,0,.08); }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+      img { max-width:100%; display:block; }
+      a { text-decoration:none; color:inherit; }
+      .container { width:min(1180px,calc(100% - 32px)); margin:0 auto; }
+      .topbar { position:sticky; top:0; z-index:50; background:rgba(255,255,255,.88); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
+      .topbar-inner { display:flex; justify-content:space-between; align-items:center; padding:16px 0; }
+      .brand { font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--primary); }
+      .nav { display:flex; gap:28px; align-items:center; color:var(--muted); font-size:14px; }
+      .cta-button,.secondary-button { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; font-weight:700; transition:.2s ease; cursor:pointer; }
+      .cta-button { background:var(--primary); color:white; padding:14px 24px; box-shadow:var(--shadow); }
+      .secondary-button { border:1px solid var(--line); background:rgba(255,255,255,.5); color:var(--text); padding:14px 22px; }
+      .hero { background:linear-gradient(rgba(17,22,18,.5),rgba(17,22,18,.45)),url("https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1800&q=80") center/cover no-repeat; min-height:760px; display:flex; align-items:center; color:white; }
+      .hero-inner { display:grid; grid-template-columns:1.3fr .7fr; gap:36px; align-items:end; padding:60px 0; }
+      .eyebrow { display:inline-block; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); border-radius:999px; padding:8px 14px; font-size:12px; text-transform:uppercase; letter-spacing:.12em; margin-bottom:16px; }
+      h1 { font-size:clamp(2.8rem,4vw,5rem); line-height:.96; margin:0 0 18px; letter-spacing:-.05em; }
+      .hero p { font-size:1.08rem; color:rgba(255,255,255,.85); max-width:640px; }
+      .hero-meta { display:flex; flex-wrap:wrap; gap:18px; margin-top:22px; color:rgba(255,255,255,.9); }
+      .hero-meta span { padding:10px 14px; background:rgba(255,255,255,.08); border-radius:999px; border:1px solid rgba(255,255,255,.15); font-size:14px; }
+      .booking-card { background:rgba(255,255,255,.96); color:var(--text); padding:26px; border-radius:28px; box-shadow:var(--shadow); }
+      .booking-card .price { font-size:2.2rem; font-weight:700; color:var(--primary); margin-bottom:10px; }
+      .booking-card .label { font-size:.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; }
+      .booking-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:24px 0; }
+      .booking-item { background:#f8f5f1; border:1px solid var(--line); border-radius:14px; padding:14px; }
+      .booking-item strong { display:block; font-size:1.1rem; margin-bottom:2px; }
+      .section { padding:90px 0; }
+      .section-title { font-size:clamp(2rem,3vw,3rem); line-height:1.1; margin:0 0 18px; letter-spacing:-.04em; }
+      .lead { color:var(--muted); font-size:1.08rem; max-width:760px; }
+      .features-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:22px; margin-top:42px; }
+      .feature-card { background:var(--panel); border-radius:22px; padding:28px 22px; border:1px solid var(--line); box-shadow:0 10px 22px rgba(0,0,0,.02); }
+      .feature-card .icon { width:52px; height:52px; border-radius:14px; background:#edf3ee; display:flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:18px; }
+      .feature-card h3 { margin:0 0 12px; font-size:1.18rem; }
+      .feature-card p { margin:0; color:var(--muted); }
+      .split { display:grid; grid-template-columns:1.1fr .9fr; gap:40px; align-items:center; }
+      .image-block { border-radius:30px; overflow:hidden; box-shadow:var(--shadow); }
+      .text-block { padding:16px 0; }
+      .check-list { list-style:none; padding:0; margin:28px 0 0; display:grid; gap:14px; }
+      .check-list li { position:relative; padding-left:30px; color:var(--text); }
+      .check-list li:before { content:"✓"; position:absolute; left:0; top:0; color:var(--primary); font-weight:700; }
+      .gallery-grid { display:grid; grid-template-columns:1.2fr .8fr .8fr; gap:18px; margin-top:42px; }
+      .gallery-grid img { width:100%; height:100%; object-fit:cover; border-radius:20px; min-height:240px; }
+      .gallery-grid .tall { grid-row:span 2; min-height:500px; }
+      .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; margin-top:44px; }
+      .stat { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:26px 18px; text-align:center; }
+      .stat .num { display:block; font-size:2.2rem; font-weight:700; color:var(--primary); }
+      .stat .txt { color:var(--muted); }
+      .area { background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,.8)); }
+      .cta-box { background:linear-gradient(135deg,var(--primary),var(--primary-2)); border-radius:30px; padding:40px 32px; display:flex; justify-content:space-between; align-items:center; gap:22px; color:white; }
+      .form-wrap { background:var(--panel); border:1px solid var(--line); border-radius:30px; padding:30px; box-shadow:var(--shadow); }
+      .form-wrap form { display:grid; gap:14px; }
+      .field { display:grid; gap:7px; }
+      .field label { font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+      .field input,.field textarea { border:1px solid var(--line); border-radius:14px; padding:14px 16px; font:inherit; background:#faf8f6; }
+      footer { padding:26px 0 60px; color:var(--muted); text-align:center; }
+      @media(max-width:980px) { .hero-inner,.split,.cta-box { grid-template-columns:1fr; display:grid; } .features-grid,.stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .gallery-grid { grid-template-columns:1fr 1fr; } }
+      @media(max-width:640px) { .nav { display:none; } .hero { min-height:620px; } .features-grid,.stats,.gallery-grid,.booking-grid { grid-template-columns:1fr; } .cta-box { padding:28px 22px; } .cta-button,.secondary-button { width:100%; } }
+    </style>
+  </head>
+  <body>
+    <header class="topbar"><div class="container topbar-inner"><div class="brand">Borzygniew / Słoneczna 13</div><nav class="nav"><a href="#opis">Opis</a><a href="#atuty">Atuty</a><a href="#galeria">Galeria</a><a href="#okolica">Okolica</a><a href="#kontakt">Kontakt</a></nav><a href="#kontakt" class="cta-button">Umów pokaz</a></div></header>
+    <section class="hero"><div class="container hero-inner"><div><div class="eyebrow">Ekspozycyjny dom przy jeziorze</div><h1>Dom z ogrodem jak mały park nad Jeziorem Mietkowskim</h1><p>W Borzygniewie, na spokojnym, zalesionym osiedlu przy ul. Słonecznej 13, znajduje się wyjątkowa nieruchomość z dużą działką, widnym domem, tarasem, szklarnią i bliskością plaż, jachtów oraz sportów wodnych.</p><div class="hero-meta"><span>10 arów działki</span><span>dom 12 x 12 m</span><span>parter + poddasze</span><span>taras + wiata</span></div></div><aside class="booking-card"><div class="label">Oferta sprzedaży</div><div class="price">Cena do ustalenia</div><div class="booking-grid"><div class="booking-item"><strong>10 arów</strong><span>działki</span></div><div class="booking-item"><strong>3</strong><span>sypialnie</span></div><div class="booking-item"><strong>2</strong><span>poziomy</span></div><div class="booking-item"><strong>29 m²</strong><span>szklarnia</span></div></div><a href="#kontakt" class="cta-button" style="width:100%;">Umów pokaz</a></aside></div></section>
+    <section id="opis" class="section"><div class="container"><div class="split"><div class="image-block"><img src="https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80" alt="Dom i ogród" /></div><div class="text-block"><div class="eyebrow" style="color:var(--primary);background:#edf3ee;border-color:#dfe9e1;">Opis nieruchomości</div><h2 class="section-title">Dom z klimatem, funkcjonalnością i pięknym otoczeniem</h2><p class="lead">To niezwykle komfortowy dom z pełnym wyposażeniem, nowoczesnym układem pomieszczeń, naturalnymi materiałami i przytulnym wnętrzem. Wnętrza są jasne, wygodne i urządzone z myślą o codziennym życiu oraz wypoczynku nad wodą.</p><ul class="check-list"><li>Przestronny salon z kominkiem oraz część dzienna na parterze</li><li>Kuchnia, łazienka, sypialnia, spiżarnia i pracownia / warsztat</li><li>Wyposażone poddasze z trzema sypialniami, studio muzycznym i łazienką</li><li>Ogrzewanie podłogowe oraz konwekcyjne, pełne wyposażenie i automatyzacja</li><li>Duży ogród z starodrzewiem, trawnikiem, kwiatami i krzewami</li></ul></div></div></div></section>
+    <section id="atuty" class="section area"><div class="container"><div class="eyebrow" style="color:var(--primary);background:#edf3ee;border-color:#dfe9e1;">Atuty</div><h2 class="section-title">Co wyróżnia ten dom?</h2><div class="features-grid"><div class="feature-card"><div class="icon">🌿</div><h3>Parkowy ogród</h3><p>10 arów działki z pięknymi drzewami, zieloną murawą, kwiatami i zadbanym otoczeniem.</p></div><div class="feature-card"><div class="icon">🏡</div><h3>Przestronny układ</h3><p>Parter z salonem, kuchnią i strefą dzienną oraz poddasze z 3 sypialniami i studiowymi.</p></div><div class="feature-card"><div class="icon">🛠️</div><h3>Pełne wyposażenie</h3><p>Dom i poddasze są urządzone, zautomatyzowane i gotowe do użytkowania od razu po przejęciu.</p></div><div class="feature-card"><div class="icon">🌊</div><h3>Bliskość jeziora</h3><p>W pobliżu plaże, jachty, szkoła windsurfingu oraz zalesiona okolica rekreacyjna.</p></div></div><div class="stats"><div class="stat"><span class="num">10</span><span class="txt">arów działki</span></div><div class="stat"><span class="num">29</span><span class="txt">m² szklarni</span></div><div class="stat"><span class="num">3</span><span class="txt">sypialnie na poddaszu</span></div><div class="stat"><span class="num">∞</span><span class="txt">spokój i klimat</span></div></div></div></section>
+    <section id="galeria" class="section"><div class="container"><div class="eyebrow" style="color:var(--primary);background:#edf3ee;border-color:#dfe9e1;">Galeria</div><h2 class="section-title">Zobacz dom i najpiękniejsze miejsca wokół</h2><div class="gallery-grid"><img class="tall" src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80" alt="Dom z zewnątrz" /><img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=900&q=80" alt="Salon" /><img src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80" alt="Ogród" /><img src="https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=900&q=80" alt="Taras" /><img src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80" alt="Park" /></div></div></section>
+    <section id="okolica" class="section area"><div class="container"><div class="split"><div class="text-block"><div class="eyebrow" style="color:var(--primary);background:#edf3ee;border-color:#dfe9e1;">Lokalizacja</div><h2 class="section-title">Spokój, natura i aktywność nad wodą</h2><p class="lead">Dom położony jest w zalesionym, starannie utrzymanym osiedlu, z drugiej strony dostępny od terenu ośrodka wypoczynkowego. W pobliżu są plaże, jachty, szkoła windsurfingu i miejsca idealne do wypoczynku przez cały rok.</p><ul class="check-list"><li>Dziewiczo zalesiona okolica z spokojnym charakterem</li><li>Bliskość jeziora oraz terenów rekreacyjnych</li><li>Wyniosłe, naturalne otoczenie i spokojna atmosfera</li><li>Idealne miejsce na dom całoroczny, letniskowy i inwestycyjny</li></ul></div><div class="image-block"><img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1200&q=80" alt="Jezioro i okolica" /></div></div></div></section>
+    <section id="kontakt" class="section"><div class="container"><div class="cta-box"><div><div class="eyebrow" style="display:inline-block;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);">Umów pokaz</div><h2 class="section-title" style="color:white;margin-top:14px;">Zobacz dom w realu i poczuj klimat miejsca</h2></div><a href="mailto:kontakt@example.com" class="secondary-button" style="background:white;color:var(--primary);border:none;">Napisz do właściciela</a></div><div style="height:34px;"></div><div class="form-wrap"><h3 style="margin-top:0;font-size:1.8rem;">Zapytaj o szczegóły</h3><form action="mailto:kontakt@example.com" method="post" enctype="text/plain"><div class="field"><label for="name">Imię i nazwisko</label><input id="name" name="Imię i nazwisko" type="text" placeholder="Twoje imię" required /></div><div class="field"><label for="email">Email</label><input id="email" name="Email" type="email" placeholder="mail@example.com" required /></div><div class="field"><label for="phone">Telefon</label><input id="phone" name="Telefon" type="tel" placeholder="+48 000 000 000" /></div><div class="field"><label for="message">Wiadomość</label><textarea id="message" name="Wiadomość" rows="5" placeholder="Chciałbym umówić pokaz domu..." required></textarea></div><button class="cta-button" type="submit" style="border:none;">Wyślij zapytanie</button></form></div></div></section>
+    <footer><div class="container">© 2026 Borzygniew | Dom przy ul. Słonecznej 13 <br />Wszystkie prawa zastrzeżone.</div></footer>
+  </body>
+</html>
