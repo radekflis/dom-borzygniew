@@ -1,3 +1,4 @@
+import type React from "react";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Building2, Camera, Compass, FileText, Images, MapPinned, MessageCircle, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 
