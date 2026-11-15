@@ -33,7 +33,8 @@ async function readPrivateBackup(): Promise<any | null> {
   db.close();
   return value;
 }
-\nconst labels: Record<Mode, string> = { kupujacy: "Kupujący", wlasciciel: "Właściciel", agencja: "Agencja" };
+
+const labels: Record<Mode, string> = { kupujacy: "Kupujący", wlasciciel: "Właściciel", agencja: "Agencja" };
 const modules = [
   { id: "overview", title: "Wizytówka i parametry", desc: "Hero, KPI, wycena i dokumentacja", icon: Building2 },
   { id: "tour", title: "Spacer przestrzenny", desc: "Stacje fotograficzne i widoki 3D", icon: Compass },
@@ -51,7 +52,8 @@ export default function App() {
   const [health, setHealth] = useState("loading");
   const [storageAvailable, setStorageAvailable] = useState(false);
   const [active, setActive] = useState("overview");
-  const [notice, setNotice] = useState("");\n  const [backupLoaded, setBackupLoaded] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [backupLoaded, setBackupLoaded] = useState(false);
   useEffect(() => { history.replaceState(null, "", "?tryb=" + mode); }, [mode]);
   useEffect(() => {
     let live = true;
@@ -132,7 +134,8 @@ function MediaArchive({items,count}:{items:any[];count:number}) {
     {visible.length ? <><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(145px,1fr))",gap:12}}>{visible.map((item:any,i:number)=><div key={item.id || i} style={{minWidth:0}}>{item.mediaType === "video" ? <video src={item.url} controls preload="none" style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#111"}}/> : <a href={item.url} target="_blank" rel="noreferrer"><img src={item.url} loading="lazy" alt={item.title || "Zdjęcie nieruchomości"} style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#eee"}}/></a>}<small className="muted" style={{display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title || item.folder || "Materiał"}</small></div>)}</div><p className="muted">Wyświetlono {visible.length} z {count.toLocaleString("pl-PL")} rekordów.</p></> : <div className="placeholder-visual"><Images size={30}/><b>Archiwum czeka na import</b><span>Przejdź do Studio sprzedawcy i zaimportuj kopię JSON.</span></div>}
   </div>;
 }
-\nfunction PhotoStudio({done}:{done:(s:string)=>void}) {
+
+function PhotoStudio({done}:{done:(s:string)=>void}) {
   const [src,setSrc] = useState("");
   const [fileName,setFileName] = useState("willa-panorama.jpg");
   const [brightness,setBrightness] = useState(0);
