@@ -7,8 +7,8 @@ const BACKUP_DB = "willa-panorama-private";
 const BACKUP_STORE = "backups";
 function openBackupDb(): Promise<IDBDatabase> {
   return new Promise((resolve,reject) => {
-    const request = indexedDB.open(BACKUP_DB, 1);
-    request.onupgradeneeded = () => request.result.createObjectStore(BACKUP_STORE);
+    const request = indexedDB.open(BACKUP_DB, 2);
+    request.onupgradeneeded = () => { const db = request.result; if (!db.objectStoreNames.contains(BACKUP_STORE)) db.createObjectStore(BACKUP_STORE); if (!db.objectStoreNames.contains("inquiries")) db.createObjectStore("inquiries", { keyPath: "id" }); };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
@@ -18,6 +18,16 @@ async function savePrivateBackup(value: any) {
   await new Promise<void>((resolve,reject) => {
     const tx = db.transaction(BACKUP_STORE,"readwrite");
     tx.objectStore(BACKUP_STORE).put(value,"latest");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+async function savePrivateInquiry(value: any) {
+  const db = await openBackupDb();
+  await new Promise<void>((resolve,reject) => {
+    const tx = db.transaction("inquiries","readwrite");
+    tx.objectStore("inquiries").put(value);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -195,10 +205,22 @@ function PhotoStudio({done}:{done:(s:string)=>void}) {
 function Placeholder({icon,title,body}:{icon:React.ReactNode;title:string;body:string}) { return <div className="panel-content"><div className="placeholder-visual">{icon}<b>{title}</b><span>{body}</span></div></div>; }
 function Contact({done}:{done:(s:string)=>void}) {
   const [name,setName] = useState(""); const [email,setEmail] = useState(""); const [message,setMessage] = useState("");
-  return <form className="contact-form" onSubmit={async e => { e.preventDefault(); const r = await fetch("/api/inquiries",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,message})}); const d = await r.json(); done(r.ok ? "Zapytanie zapisane." : d.error || "Nie udało się zapisać zapytania."); }}>
+  const [busy,setBusy] = useState(false);
+  return <form className="contact-form" onSubmit={async e => {
+    e.preventDefault(); if (busy) return; setBusy(true);
+    const inquiry = { id: crypto.randomUUID(), name: name.trim(), email: email.trim(), message: message.trim(), status: "nowe", createdAt: new Date().toISOString(), storage: "local" };
+    try {
+      const r = await fetch("/api/inquiries",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,message})});
+      if (r.ok) { done("Zapytanie zapisane na serwerze."); setName(""); setEmail(""); setMessage(""); }
+      else { await savePrivateInquiry(inquiry); done("Serwer nie ma jeszcze magazynu danych. Zapytanie zapisano lokalnie na tym urządzeniu — trzeba je później przenieść do wspólnej skrzynki."); setName(""); setEmail(""); setMessage(""); }
+    } catch {
+      try { await savePrivateInquiry(inquiry); done("Brak połączenia z serwerem. Zapytanie zapisano lokalnie na tym urządzeniu."); setName(""); setEmail(""); setMessage(""); }
+      catch { done("Nie udało się zapisać zgłoszenia. Skopiuj treść i spróbuj ponownie."); }
+    } finally { setBusy(false); }
+  }}>
     <label>Imię i nazwisko<input required value={name} onChange={e=>setName(e.target.value)}/></label>
     <label>E-mail<input required type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
     <label>Wiadomość<textarea required value={message} onChange={e=>setMessage(e.target.value)}/></label>
-    <button className="primary">Wyślij zapytanie <ArrowUpRight size={15}/></button>
+    <button className="primary" disabled={busy}>{busy ? "Zapisywanie…" : "Wyślij zapytanie"} <ArrowUpRight size={15}/></button>
   </form>;
 }
