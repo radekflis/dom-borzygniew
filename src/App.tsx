@@ -19,13 +19,14 @@ export default function App() {
   const [mode, setMode] = useState<Mode>(initial && initial in labels ? initial : "kupujacy");
   const [workspace, setWorkspace] = useState<any>({});
   const [health, setHealth] = useState("loading");
+  const [storageAvailable, setStorageAvailable] = useState(false);
   const [active, setActive] = useState("overview");
   const [notice, setNotice] = useState("");
   useEffect(() => { history.replaceState(null, "", "?tryb=" + mode); }, [mode]);
   useEffect(() => {
     let live = true;
     Promise.all([fetch("/api/workspace").then(r => r.ok ? r.json() : Promise.reject()), fetch("/api/health").then(r => r.ok ? r.json() : Promise.reject())])
-      .then(([data]) => { if (live) { setWorkspace(data); setHealth("ok"); } })
+      .then(([data, status]) => { if (live) { setWorkspace(data); setStorageAvailable(Boolean(status.storageConfigured)); setHealth("ok"); } })
       .catch(() => { if (live) setHealth("error"); });
     return () => { live = false; };
   }, []);
@@ -45,7 +46,7 @@ export default function App() {
     <section className="hero" id="top"><div className="hero-copy"><span className="eyebrow">BORZYGNIEW · JEZIORO MIETKOWSKIE</span><h1>Przestrzeń, która<br/><i>ma swoją historię.</i></h1>
       <p>{property.tagline || "Dom w Borzygniewie — cyfrowa prezentacja nieruchomości i centrum zarządzania ofertą."}</p>
       <div className="hero-actions"><button className="primary" onClick={() => setActive("tour")}>Otwórz spacer <ArrowUpRight size={16}/></button><button className="ghost" onClick={() => setActive("media")}>Zobacz archiwum</button></div>
-      <div className="hero-status"><span className={health === "ok" ? "dot live" : "dot"}/>{health === "ok" ? "Połączenie z serwerem aktywne" : health === "loading" ? "Łączenie z serwerem…" : "Tryb ograniczony — brak API"}</div>
+      <div className="hero-status"><span className={health === "ok" ? "dot live" : "dot"}/>{health === "ok" ? (storageAvailable ? "API i magazyn danych aktywne" : "API aktywne · magazyn trwały jeszcze niepodłączony") : health === "loading" ? "Łączenie z serwerem…" : "Tryb ograniczony — brak API"}</div>
     </div><div className="hero-art"><div className="art-frame"><img src={property.heroImageUrl || "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=85"} alt="Zdjęcie ilustracyjne architektury domu"/><div className="art-caption"><span>01 / RESIDENCE</span><b>Dom w Borzygniewie</b></div></div><div className="art-note"><Sparkles size={16}/><span>Cyfrowe studio nieruchomości<br/><b>Osiem modułów projektu</b></span></div></div></section>
     <section className="metrics">{[["Materiały", mediaCount ? mediaCount.toLocaleString("pl-PL") : "—"], ["Powierzchnia", "Do potwierdzenia"], ["Działka", "Do potwierdzenia"], ["Prowizja", "0%"]].map(([a,b]) => <div key={a}><span>{a}</span><b>{b}</b></div>)}</section>
     <section className="workspace"><div className="section-heading"><div><span className="eyebrow">WORKSPACE / {mode.toUpperCase()}</span><h2>Centrum nieruchomości</h2></div><span className="data-note"><ShieldCheck size={15}/> Dane serwerowe · bez kluczy w przeglądarce</span></div>
