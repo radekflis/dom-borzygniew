@@ -3,7 +3,37 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Building2, Camera, Compass, FileText, Images, MapPinned, MessageCircle, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 
 type Mode = "kupujacy" | "wlasciciel" | "agencja";
-const labels: Record<Mode, string> = { kupujacy: "Kupujący", wlasciciel: "Właściciel", agencja: "Agencja" };
+const BACKUP_DB = "willa-panorama-private";
+const BACKUP_STORE = "backups";
+function openBackupDb(): Promise<IDBDatabase> {
+  return new Promise((resolve,reject) => {
+    const request = indexedDB.open(BACKUP_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(BACKUP_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function savePrivateBackup(value: any) {
+  const db = await openBackupDb();
+  await new Promise<void>((resolve,reject) => {
+    const tx = db.transaction(BACKUP_STORE,"readwrite");
+    tx.objectStore(BACKUP_STORE).put(value,"latest");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+async function readPrivateBackup(): Promise<any | null> {
+  const db = await openBackupDb();
+  const value = await new Promise<any>((resolve,reject) => {
+    const request = db.transaction(BACKUP_STORE,"readonly").objectStore(BACKUP_STORE).get("latest");
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => reject(request.error);
+  });
+  db.close();
+  return value;
+}
+\nconst labels: Record<Mode, string> = { kupujacy: "Kupujący", wlasciciel: "Właściciel", agencja: "Agencja" };
 const modules = [
   { id: "overview", title: "Wizytówka i parametry", desc: "Hero, KPI, wycena i dokumentacja", icon: Building2 },
   { id: "tour", title: "Spacer przestrzenny", desc: "Stacje fotograficzne i widoki 3D", icon: Compass },
@@ -21,7 +51,7 @@ export default function App() {
   const [health, setHealth] = useState("loading");
   const [storageAvailable, setStorageAvailable] = useState(false);
   const [active, setActive] = useState("overview");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState("");\n  const [backupLoaded, setBackupLoaded] = useState(false);
   useEffect(() => { history.replaceState(null, "", "?tryb=" + mode); }, [mode]);
   useEffect(() => {
     let live = true;
@@ -54,11 +84,11 @@ export default function App() {
         <article className="module-panel"><div className="panel-top"><div className="panel-icon"><Icon size={21}/></div><div><span className="eyebrow">MODUŁ {String(modules.findIndex(m => m.id === active) + 1).padStart(2, "0")}</span><h3>{current.title}</h3></div></div><p>{current.desc}</p>
           {active === "overview" && <div className="panel-content"><p className="muted">Dane źródłowe zostaną pokazane po imporcie kopii zapasowej. Rozbieżne wartości nie będą automatycznie ujednolicane.</p><div className="status-row"><span>Profil nieruchomości</span><b>{property.name || "Oczekuje na import danych"}</b></div><div className="status-row"><span>Zaimportowane media</span><b>{mediaCount || "Oczekuje na import"}</b></div></div>}
           {active === "tour" && <Placeholder icon={<Compass size={34}/>} title="Spacer przestrzenny — etap konstrukcji" body="Widok 3D zostanie zbudowany na podstawie rzeczywistych stacji fotograficznych i klatek wideo. Nie generujemy fikcyjnego modelu domu."/>}
-          {active === "media" && <div className="panel-content"><div className="status-row"><span>Pliki w archiwum</span><b>{mediaCount || "Nie zaimportowano"}</b></div><p className="muted">Oryginalne adresy mediów i metadane pozostają w kopii zapasowej do czasu pełnego importu.</p></div>}
+          {active === "media" && <MediaArchive items={workspace.importedMedia || []} count={mediaCount}/> }
           {active === "studio" && <PhotoStudio done={setNotice}/>}
           {active === "map" && <Placeholder icon={<MapPinned size={34}/>} title="Mapa terenu i analiza okolicy" body="Po imporcie współrzędnych nieruchomości podłączymy warstwy OSM, POI i trasy. Brak współrzędnych nie będzie zastępowany zgadywaniem."/>}
           {active === "market" && <div className="panel-content"><p className="muted">API giełdy jest przygotowane. Dane ofert i wiadomości zostaną odczytane z kopii zapasowej.</p><button className="ghost" onClick={() => fetch("/api/marketplace/pins").then(r => r.json()).then(d => setNotice("Giełda: " + (d.pins?.length ?? 0) + " ofert w aktywnym magazynie."))}>Sprawdź oferty</button></div>}
-          {active === "seller" && <div className="panel-content"><p className="muted">Panel właściciela: import mediów, marketing, dokumenty/OCR oraz skrzynka kupujących. Funkcje będą aktywowane moduł po module.</p></div>}
+          {active === "seller" && <BackupImport onImported={async backup => { await savePrivateBackup(backup); setWorkspace(backup.workspace); setBackupLoaded(true); setNotice("Kopia zapisana prywatnie w tej przeglądarce. Nie wysłano jej na GitHub ani serwer."); }} loaded={backupLoaded} count={mediaCount}/> }
           {active === "contact" && <Contact done={setNotice}/>}
         </article></div>
     </section>
@@ -66,7 +96,40 @@ export default function App() {
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice} ×</button>}
   </main>;
 }
-function PhotoStudio({done}:{done:(s:string)=>void}) {
+function BackupImport({onImported,loaded,count}:{onImported:(b:any)=>Promise<void>;loaded:boolean;count:number}) {
+  const [busy,setBusy] = useState(false);
+  const [message,setMessage] = useState("");
+  return <div className="panel-content">
+    <p className="muted">Import kopii JSON do prywatnej pamięci tej przeglądarki. Plik nie trafia do publicznego repozytorium ani na serwer. Dane pozostają na tym urządzeniu i w tym profilu przeglądarki.</p>
+    <div className="status-row"><span>Status archiwum</span><b>{loaded ? "Zaimportowano" : "Oczekuje na import"}</b></div>
+    <div className="status-row"><span>Rekordy mediów</span><b>{count.toLocaleString("pl-PL")}</b></div>
+    <label className="field-label">Wybierz plik kopii JSON<input type="file" accept=".json,application/json" disabled={busy} onChange={async e => {
+      const file = e.target.files?.[0]; if (!file) return;
+      setBusy(true); setMessage("");
+      try {
+        if (file.size > 100 * 1024 * 1024) throw new Error("Plik przekracza limit 100 MB.");
+        const parsed = JSON.parse(await file.text());
+        if (!parsed || typeof parsed !== "object" || !parsed.workspace || !Array.isArray(parsed.workspace.importedMedia)) throw new Error("Nie rozpoznano kopii Willa Panorama — brak workspace.importedMedia.");
+        await onImported(parsed);
+        setMessage("Import zakończony: " + parsed.workspace.importedMedia.length.toLocaleString("pl-PL") + " rekordów mediów.");
+      } catch(err:any) { setMessage(err?.message || "Nie udało się odczytać kopii."); }
+      finally { setBusy(false); e.target.value = ""; }
+    }}/></label>
+    {busy && <p className="muted">Odczyt i zapis kopii…</p>}
+    {message && <p className="muted" role="status">{message}</p>}
+    <p className="muted">Etap bezpłatny, lokalny — dane nie synchronizują się między urządzeniami. Zachowaj oryginalny JSON.</p>
+  </div>;
+}
+function MediaArchive({items,count}:{items:any[];count:number}) {
+  const [filter,setFilter] = useState("all");
+  const visible = items.filter(item => filter === "all" || (filter === "video" ? item.mediaType === "video" : item.mediaType !== "video")).slice(0,24);
+  return <div className="panel-content">
+    <div className="status-row"><span>Rekordy w archiwum</span><b>{count.toLocaleString("pl-PL")}</b></div>
+    <div style={{display:"flex",gap:8,margin:"14px 0"}}><button className={filter==="all"?"primary":"ghost"} onClick={()=>setFilter("all")}>Wszystkie</button><button className={filter==="image"?"primary":"ghost"} onClick={()=>setFilter("image")}>Zdjęcia</button><button className={filter==="video"?"primary":"ghost"} onClick={()=>setFilter("video")}>Wideo</button></div>
+    {visible.length ? <><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(145px,1fr))",gap:12}}>{visible.map((item:any,i:number)=><div key={item.id || i} style={{minWidth:0}}>{item.mediaType === "video" ? <video src={item.url} controls preload="none" style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#111"}}/> : <a href={item.url} target="_blank" rel="noreferrer"><img src={item.url} loading="lazy" alt={item.title || "Zdjęcie nieruchomości"} style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#eee"}}/></a>}<small className="muted" style={{display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title || item.folder || "Materiał"}</small></div>)}</div><p className="muted">Wyświetlono {visible.length} z {count.toLocaleString("pl-PL")} rekordów.</p></> : <div className="placeholder-visual"><Images size={30}/><b>Archiwum czeka na import</b><span>Przejdź do Studio sprzedawcy i zaimportuj kopię JSON.</span></div>}
+  </div>;
+}
+\nfunction PhotoStudio({done}:{done:(s:string)=>void}) {
   const [src,setSrc] = useState("");
   const [fileName,setFileName] = useState("willa-panorama.jpg");
   const [brightness,setBrightness] = useState(0);
