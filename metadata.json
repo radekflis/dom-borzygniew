@@ -1,0 +1,8 @@
+{
+  "name": "Willa Panorama",
+  "description": "Portal nieruchomości 3D i Studio AI — Reset Konstytucyjny",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "version": "0.1.0"
+}
