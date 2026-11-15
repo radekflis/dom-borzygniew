@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Building2, Camera, Compass, FileText, Images, MapPinned, MessageCircle, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 
 type Mode = "kupujacy" | "wlasciciel" | "agencja";
@@ -55,7 +55,7 @@ export default function App() {
           {active === "overview" && <div className="panel-content"><p className="muted">Dane źródłowe zostaną pokazane po imporcie kopii zapasowej. Rozbieżne wartości nie będą automatycznie ujednolicane.</p><div className="status-row"><span>Profil nieruchomości</span><b>{property.name || "Oczekuje na import danych"}</b></div><div className="status-row"><span>Zaimportowane media</span><b>{mediaCount || "Oczekuje na import"}</b></div></div>}
           {active === "tour" && <Placeholder icon={<Compass size={34}/>} title="Spacer przestrzenny — etap konstrukcji" body="Widok 3D zostanie zbudowany na podstawie rzeczywistych stacji fotograficznych i klatek wideo. Nie generujemy fikcyjnego modelu domu."/>}
           {active === "media" && <div className="panel-content"><div className="status-row"><span>Pliki w archiwum</span><b>{mediaCount || "Nie zaimportowano"}</b></div><p className="muted">Oryginalne adresy mediów i metadane pozostają w kopii zapasowej do czasu pełnego importu.</p></div>}
-          {active === "studio" && <div className="panel-content"><label className="field-label">Polecenie korekty<textarea id="studio-prompt" placeholder="Np. odzyskaj szczegóły w cieniach i ocieplij balans bieli…"/></label><button className="primary" onClick={async () => { const prompt = (document.getElementById("studio-prompt") as HTMLTextAreaElement).value; const r = await fetch("/api/ai/open-studio-plan", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({prompt}) }); const d = await r.json(); setNotice(d.notice || "Plan korekty przygotowany."); }}>Przygotuj plan korekty <Sparkles size={15}/></button></div>}
+          {active === "studio" && <PhotoStudio done={setNotice}/>}
           {active === "map" && <Placeholder icon={<MapPinned size={34}/>} title="Mapa terenu i analiza okolicy" body="Po imporcie współrzędnych nieruchomości podłączymy warstwy OSM, POI i trasy. Brak współrzędnych nie będzie zastępowany zgadywaniem."/>}
           {active === "market" && <div className="panel-content"><p className="muted">API giełdy jest przygotowane. Dane ofert i wiadomości zostaną odczytane z kopii zapasowej.</p><button className="ghost" onClick={() => fetch("/api/marketplace/pins").then(r => r.json()).then(d => setNotice("Giełda: " + (d.pins?.length ?? 0) + " ofert w aktywnym magazynie."))}>Sprawdź oferty</button></div>}
           {active === "seller" && <div className="panel-content"><p className="muted">Panel właściciela: import mediów, marketing, dokumenty/OCR oraz skrzynka kupujących. Funkcje będą aktywowane moduł po module.</p></div>}
@@ -65,6 +65,63 @@ export default function App() {
     <footer><span>WILLA PANORAMA · RESET KONSTYTUCYJNY</span><span>PROJEKT 2026 · TRYB {labels[mode]}</span></footer>
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice} ×</button>}
   </main>;
+}
+function PhotoStudio({done}:{done:(s:string)=>void}) {
+  const [src,setSrc] = useState("");
+  const [fileName,setFileName] = useState("willa-panorama.jpg");
+  const [brightness,setBrightness] = useState(0);
+  const [contrast,setContrast] = useState(0);
+  const [saturation,setSaturation] = useState(0);
+  const [warmth,setWarmth] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!src || !canvasRef.current) return;
+    const image = new Image();
+    image.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight));
+      canvas.width = Math.round(image.naturalWidth * scale);
+      canvas.height = Math.round(image.naturalHeight * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.filter = `brightness(${100 + brightness}%) contrast(${100 + contrast}%) saturate(${100 + saturation}%) sepia(${Math.max(0,warmth)}%)`;
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      ctx.filter = "none";
+      if (warmth < 0) {
+        ctx.fillStyle = `rgba(70,135,190,${Math.abs(warmth)/500})`;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      }
+    };
+    image.src = src;
+  }, [src,brightness,contrast,saturation,warmth]);
+  useEffect(() => () => { if (src.startsWith("blob:")) URL.revokeObjectURL(src); }, [src]);
+  const reset = () => { setBrightness(0); setContrast(0); setSaturation(0); setWarmth(0); };
+  const save = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob(blob => {
+      if (!blob) return done("Nie udało się przygotować pliku.");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName.replace(/\\.[^.]+$/, "") + "-retusz.jpg"; a.click();
+      URL.revokeObjectURL(url);
+      done("Gotowe — retusz zapisano lokalnie. Oryginał pozostał bez zmian.");
+    }, "image/jpeg", 0.94);
+  };
+  const slider = (label:string,value:number,set:(n:number)=>void) => <label className="field-label" style={{display:"grid",gridTemplateColumns:"1fr auto",gap:8,marginBottom:12}}>{label}<b>{value>0?"+":""}{value}</b><input style={{gridColumn:"1 / -1",width:"100%"}} type="range" min="-30" max="30" value={value} onChange={e=>set(Number(e.target.value))}/></label>;
+  return <div className="panel-content">
+    <p className="muted">Lokalny retusz Canvas 2D. Zdjęcie nie jest wysyłane na serwer, nie uruchamiamy płatnego generowania obrazu.</p>
+    <label className="field-label">Wybierz zdjęcie<input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setFileName(f.name);setSrc(URL.createObjectURL(f));reset();}}}/></label>
+    {src ? <><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,margin:"16px 0"}}>
+      <div><small className="muted">ORYGINAŁ</small><img src={src} alt="Oryginalne zdjęcie" style={{width:"100%",maxHeight:320,objectFit:"contain",background:"#111",borderRadius:12}}/></div>
+      <div><small className="muted">PODGLĄD RETUSZU</small><canvas ref={canvasRef} style={{width:"100%",maxHeight:320,objectFit:"contain",background:"#111",borderRadius:12}}/></div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"4px 18px"}}>
+      {slider("Jasność",brightness,setBrightness)}{slider("Kontrast",contrast,setContrast)}{slider("Nasycenie",saturation,setSaturation)}{slider("Temperatura",warmth,setWarmth)}
+    </div>
+    <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}><button className="primary" onClick={save}>Zapisz retusz lokalnie</button><button className="ghost" onClick={reset}>Resetuj korekty</button></div></> : <div className="placeholder-visual"><Camera size={32}/><b>Studio gotowe na zdjęcie</b><span>Wybierz plik z urządzenia. Korekty i eksport działają lokalnie w tej przeglądarce.</span></div>}
+  </div>;
 }
 function Placeholder({icon,title,body}:{icon:React.ReactNode;title:string;body:string}) { return <div className="panel-content"><div className="placeholder-visual">{icon}<b>{title}</b><span>{body}</span></div></div>; }
 function Contact({done}:{done:(s:string)=>void}) {
