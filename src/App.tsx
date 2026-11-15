@@ -33,6 +33,16 @@ async function savePrivateInquiry(value: any) {
   });
   db.close();
 }
+async function readPrivateInquiries(): Promise<any[]> {
+  const db = await openBackupDb();
+  const value = await new Promise<any[]>((resolve,reject) => {
+    const request = db.transaction("inquiries","readonly").objectStore("inquiries").getAll();
+    request.onsuccess = () => resolve(request.result ?? []);
+    request.onerror = () => reject(request.error);
+  });
+  db.close();
+  return value.sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
 async function readPrivateBackup(): Promise<any | null> {
   const db = await openBackupDb();
   const value = await new Promise<any>((resolve,reject) => {
@@ -103,13 +113,59 @@ export default function App() {
           {active === "studio" && <PhotoStudio done={setNotice}/>}
           {active === "map" && <Placeholder icon={<MapPinned size={34}/>} title="Mapa terenu i analiza okolicy" body="Po imporcie współrzędnych nieruchomości podłączymy warstwy OSM, POI i trasy. Brak współrzędnych nie będzie zastępowany zgadywaniem."/>}
           {active === "market" && <div className="panel-content"><p className="muted">API giełdy jest przygotowane. Dane ofert i wiadomości zostaną odczytane z kopii zapasowej.</p><button className="ghost" onClick={() => fetch("/api/marketplace/pins").then(r => r.json()).then(d => setNotice("Giełda: " + (d.pins?.length ?? 0) + " ofert w aktywnym magazynie."))}>Sprawdź oferty</button></div>}
-          {active === "seller" && <BackupImport onImported={async backup => { await savePrivateBackup(backup); setWorkspace(backup.workspace); setBackupLoaded(true); setNotice("Kopia zapisana prywatnie w tej przeglądarce. Nie wysłano jej na GitHub ani serwer."); }} loaded={backupLoaded} count={mediaCount}/> }
+          {active === "seller" && <><BackupImport onImported={async backup => { await savePrivateBackup(backup); setWorkspace(backup.workspace); setBackupLoaded(true); setNotice("Kopia zapisana prywatnie w tej przeglądarce. Nie wysłano jej na GitHub ani serwer."); }} loaded={backupLoaded} count={mediaCount}/><OwnerInbox /></> }
           {active === "contact" && <Contact done={setNotice}/>}
         </article></div>
     </section>
     <footer><span>WILLA PANORAMA · RESET KONSTYTUCYJNY</span><span>PROJEKT 2026 · TRYB {labels[mode]}</span></footer>
     {notice && <button className="toast" onClick={() => setNotice("")}>{notice} ×</button>}
   </main>;
+}
+function OwnerInbox() {
+  const [rows,setRows] = useState<any[]>([]);
+  const [loading,setLoading] = useState(false);
+  const [message,setMessage] = useState("");
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const local = await readPrivateInquiries();
+      let remote:any[] = [];
+      try {
+        const response = await fetch("/api/inquiries");
+        if (response.ok) {
+          const data = await response.json();
+          remote = Array.isArray(data) ? data : Array.isArray(data.inquiries) ? data.inquiries : [];
+        }
+      } catch { /* local inbox remains available offline */ }
+      const merged = new Map<string,any>();
+      [...remote,...local].forEach(row => merged.set(row.id || row.createdAt + row.email, row));
+      setRows([...merged.values()].sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))));
+      setMessage(local.length ? "Lokalne zgłoszenia są zapisane wyłącznie na tym urządzeniu." : "Brak lokalnych zgłoszeń.");
+    } catch { setMessage("Nie udało się odczytać lokalnej skrzynki."); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void refresh(); }, []);
+  const exportRows = () => {
+    const blob = new Blob([JSON.stringify({exportedAt:new Date().toISOString(),inquiries:rows},null,2)],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download="willa-panorama-zapytania.json"; a.click();
+    URL.revokeObjectURL(url);
+    setMessage("Przygotowano eksport JSON. Plik zawiera dane kontaktowe — przechowuj go prywatnie.");
+  };
+  return <section className="panel-content" style={{marginTop:24,borderTop:"1px solid var(--line)",paddingTop:20}}>
+    <div className="panel-top"><div className="panel-icon"><MessageCircle size={20}/></div><div><span className="eyebrow">TYLKO NA TYM URZĄDZENIU + DANE SERWEROWE</span><h3>Skrzynka zapytań</h3></div></div>
+    <p className="muted">Lokalne zgłoszenia pozostają w pamięci tej przeglądarki. Eksport pozwala zachować kopię i przenieść ją ręcznie; nie jest to jeszcze synchronizacja między urządzeniami.</p>
+    <div className="status-row"><span>Widoczne zgłoszenia</span><b>{rows.length}</b></div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"12px 0"}}><button className="ghost" disabled={loading} onClick={()=>void refresh()}>{loading?"Odczyt…":"Odśwież skrzynkę"}</button><button className="primary" disabled={!rows.length} onClick={exportRows}>Eksportuj zgłoszenia JSON</button></div>
+    {message && <p className="muted" role="status">{message}</p>}
+    {rows.length ? <div style={{display:"grid",gap:10}}>{rows.map((row:any,i:number)=><article key={row.id || i} style={{padding:12,border:"1px solid var(--line)",borderRadius:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}><b>{row.name || "Bez nazwiska"}</b><small className="muted">{row.createdAt ? new Date(row.createdAt).toLocaleString("pl-PL") : "Brak daty"}</small></div>
+      <a href={"mailto:"+encodeURIComponent(row.email || "")}>{row.email || "Brak e-maila"}</a>
+      {row.phone && <p className="muted">{row.phone}</p>}
+      <p style={{whiteSpace:"pre-wrap"}}>{row.message || ""}</p>
+      <small className="muted">Status: {row.status || "nowe"} · {row.storage === "local" ? "zapis lokalny" : "zapis serwerowy"}</small>
+    </article>)}</div> : <div className="placeholder-visual"><MessageCircle size={28}/><b>Brak zgłoszeń</b><span>Zapytania wysłane z formularza na tym urządzeniu pojawią się tutaj.</span></div>}
+  </section>;
 }
 function BackupImport({onImported,loaded,count}:{onImported:(b:any)=>Promise<void>;loaded:boolean;count:number}) {
   const [busy,setBusy] = useState(false);
