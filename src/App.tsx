@@ -56,7 +56,10 @@ export default function App() {
   useEffect(() => {
     let live = true;
     Promise.all([fetch("/api/workspace").then(r => r.ok ? r.json() : Promise.reject()), fetch("/api/health").then(r => r.ok ? r.json() : Promise.reject())])
-      .then(([data, status]) => { if (live) { setWorkspace(data); setStorageAvailable(Boolean(status.storageConfigured)); setHealth("ok"); } })
+      .then(async ([data, status]) => {
+        const saved = await readPrivateBackup().catch(() => null);
+        if (live) { setWorkspace(saved?.workspace ?? data); setBackupLoaded(Boolean(saved?.workspace)); setStorageAvailable(Boolean(status.storageConfigured)); setHealth("ok"); }
+      })
       .catch(() => { if (live) setHealth("error"); });
     return () => { live = false; };
   }, []);
