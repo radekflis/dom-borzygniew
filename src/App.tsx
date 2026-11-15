@@ -77,12 +77,32 @@ export default function App() {
   useEffect(() => { history.replaceState(null, "", "?tryb=" + mode); }, [mode]);
   useEffect(() => {
     let live = true;
-    Promise.all([fetch("/api/workspace").then(r => r.ok ? r.json() : Promise.reject()), fetch("/api/health").then(r => r.ok ? r.json() : Promise.reject())])
-      .then(async ([data, status]) => {
-        const saved = await readPrivateBackup().catch(() => null);
-        if (live) { setWorkspace(saved?.workspace ?? data); setBackupLoaded(Boolean(saved?.workspace)); setStorageAvailable(Boolean(status.storageConfigured)); setHealth("ok"); }
-      })
-      .catch(() => { if (live) setHealth("error"); });
+    // Local archive is the source of truth for the static Vercel build.
+    // It must load even when optional server endpoints are unavailable.
+    void readPrivateBackup().then(saved => {
+      if (!live) return;
+      if (saved?.workspace) {
+        setWorkspace(saved.workspace);
+        setBackupLoaded(true);
+      }
+      setHealth("local");
+    }).catch(() => { if (live) setHealth("local"); });
+
+    // Check the API independently; never let its failure block local data.
+    void fetch("/api/health").then(async response => {
+      if (!response.ok) throw new Error("API unavailable");
+      return response.json();
+    }).then(status => {
+      if (live) {
+        setStorageAvailable(Boolean(status.storageConfigured));
+        setHealth("ok");
+      }
+    }).catch(() => {
+      if (live) {
+        setStorageAvailable(false);
+        setHealth("local");
+      }
+    });
     return () => { live = false; };
   }, []);
   const property = workspace.property ?? {};
@@ -113,7 +133,15 @@ export default function App() {
           {active === "studio" && <PhotoStudio done={setNotice}/>}
           {active === "map" && <Placeholder icon={<MapPinned size={34}/>} title="Mapa terenu i analiza okolicy" body="Po imporcie współrzędnych nieruchomości podłączymy warstwy OSM, POI i trasy. Brak współrzędnych nie będzie zastępowany zgadywaniem."/>}
           {active === "market" && <div className="panel-content"><p className="muted">API giełdy jest przygotowane. Dane ofert i wiadomości zostaną odczytane z kopii zapasowej.</p><button className="ghost" onClick={() => fetch("/api/marketplace/pins").then(r => r.json()).then(d => setNotice("Giełda: " + (d.pins?.length ?? 0) + " ofert w aktywnym magazynie."))}>Sprawdź oferty</button></div>}
-          {active === "seller" && <><BackupImport onImported={async backup => { await savePrivateBackup(backup); setWorkspace(backup.workspace); setBackupLoaded(true); setNotice("Kopia zapisana prywatnie w tej przeglądarce. Nie wysłano jej na GitHub ani serwer."); }} loaded={backupLoaded} count={mediaCount}/><OwnerInbox /></> }
+          {active === "seller" && <><BackupImport onImported={async backup => {
+            await savePrivateBackup(backup);
+            for (const inquiry of (Array.isArray(backup.inquiries) ? backup.inquiries : [])) {
+              await savePrivateInquiry({ ...inquiry, storage: "local" });
+            }
+            setWorkspace(backup.workspace);
+            setBackupLoaded(true);
+            setNotice("Kopia zapisana prywatnie w tej przeglądarce. Nie wysłano jej na GitHub ani serwer.");
+          }} loaded={backupLoaded} count={mediaCount}/><OwnerInbox /></> }
           {active === "contact" && <Contact done={setNotice}/>}
         </article></div>
     </section>
