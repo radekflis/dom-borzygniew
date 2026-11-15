@@ -198,10 +198,25 @@ function OwnerInbox() {
 function BackupImport({onImported,loaded,count}:{onImported:(b:any)=>Promise<void>;loaded:boolean;count:number}) {
   const [busy,setBusy] = useState(false);
   const [message,setMessage] = useState("");
+  const exportBackup = async () => {
+    try {
+      const backup = await readPrivateBackup();
+      if (!backup) { setMessage("Brak kopii w pamięci tej przeglądarki."); return; }
+      const blob = new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href=url; a.download="willa-panorama-kopia-prywatna.json"; a.click();
+      URL.revokeObjectURL(url);
+      setMessage("Wyeksportowano kopię z pamięci urządzenia. Plik zawiera prywatne dane i linki do mediów — przechowuj go bezpiecznie.");
+    } catch { setMessage("Nie udało się odczytać kopii do eksportu."); }
+  };
   return <div className="panel-content">
     <p className="muted">Import kopii JSON do prywatnej pamięci tej przeglądarki. Plik nie trafia do publicznego repozytorium ani na serwer. Dane pozostają na tym urządzeniu i w tym profilu przeglądarki.</p>
     <div className="status-row"><span>Status archiwum</span><b>{loaded ? "Zaimportowano" : "Oczekuje na import"}</b></div>
     <div className="status-row"><span>Rekordy mediów</span><b>{count.toLocaleString("pl-PL")}</b></div>
+    <div style={{display:"flex",gap:10,flexWrap:"wrap",margin:"14px 0"}}>
+      <button className="ghost" disabled={!loaded || busy} onClick={()=>void exportBackup()}>Eksportuj kopię z urządzenia</button>
+      <span className="muted" style={{alignSelf:"center"}}>Wykonuj eksport po każdej większej zmianie.</span>
+    </div>
     <label className="field-label">Wybierz plik kopii JSON<input type="file" accept=".json,application/json" disabled={busy} onChange={async e => {
       const file = e.target.files?.[0]; if (!file) return;
       setBusy(true); setMessage("");
@@ -216,16 +231,39 @@ function BackupImport({onImported,loaded,count}:{onImported:(b:any)=>Promise<voi
     }}/></label>
     {busy && <p className="muted">Odczyt i zapis kopii…</p>}
     {message && <p className="muted" role="status">{message}</p>}
-    <p className="muted">Etap bezpłatny, lokalny — dane nie synchronizują się między urządzeniami. Zachowaj oryginalny JSON.</p>
+    <p className="muted">Etap bezpłatny, lokalny — dane nie synchronizują się między urządzeniami. Zachowaj również oryginalny JSON.</p>
   </div>;
 }
 function MediaArchive({items,count}:{items:any[];count:number}) {
   const [filter,setFilter] = useState("all");
-  const visible = items.filter(item => filter === "all" || (filter === "video" ? item.mediaType === "video" : item.mediaType !== "video")).slice(0,24);
+  const [folder,setFolder] = useState("all");
+  const [search,setSearch] = useState("");
+  const [page,setPage] = useState(0);
+  const pageSize = 36;
+  const folders = [...new Set(items.map(item => String(item.folder || "").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pl"));
+  const filtered = items.filter(item => {
+    const typeMatch = filter === "all" || (filter === "video" ? item.mediaType === "video" : item.mediaType !== "video");
+    const folderMatch = folder === "all" || item.folder === folder;
+    const q = search.trim().toLocaleLowerCase("pl");
+    const searchMatch = !q || [item.title,item.folder,item.category,item.roomZone,...(Array.isArray(item.tags)?item.tags:[])].some(v=>String(v||"").toLocaleLowerCase("pl").includes(q));
+    return typeMatch && folderMatch && searchMatch;
+  });
+  const pageCount = Math.max(1,Math.ceil(filtered.length/pageSize));
+  const visible = filtered.slice(page*pageSize,(page+1)*pageSize);
+  useEffect(()=>{setPage(0);},[filter,folder,search]);
   return <div className="panel-content">
     <div className="status-row"><span>Rekordy w archiwum</span><b>{count.toLocaleString("pl-PL")}</b></div>
-    <div style={{display:"flex",gap:8,margin:"14px 0"}}><button className={filter==="all"?"primary":"ghost"} onClick={()=>setFilter("all")}>Wszystkie</button><button className={filter==="image"?"primary":"ghost"} onClick={()=>setFilter("image")}>Zdjęcia</button><button className={filter==="video"?"primary":"ghost"} onClick={()=>setFilter("video")}>Wideo</button></div>
-    {visible.length ? <><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(145px,1fr))",gap:12}}>{visible.map((item:any,i:number)=><div key={item.id || i} style={{minWidth:0}}>{item.mediaType === "video" ? <video src={item.url} controls preload="none" style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#111"}}/> : <a href={item.url} target="_blank" rel="noreferrer"><img src={item.url} loading="lazy" alt={item.title || "Zdjęcie nieruchomości"} style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#eee"}}/></a>}<small className="muted" style={{display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title || item.folder || "Materiał"}</small></div>)}</div><p className="muted">Wyświetlono {visible.length} z {count.toLocaleString("pl-PL")} rekordów.</p></> : <div className="placeholder-visual"><Images size={30}/><b>Archiwum czeka na import</b><span>Przejdź do Studio sprzedawcy i zaimportuj kopię JSON.</span></div>}
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"14px 0"}}>
+      <button className={filter==="all"?"primary":"ghost"} onClick={()=>setFilter("all")}>Wszystkie ({items.length})</button>
+      <button className={filter==="image"?"primary":"ghost"} onClick={()=>setFilter("image")}>Zdjęcia ({items.filter(x=>x.mediaType!=="video").length})</button>
+      <button className={filter==="video"?"primary":"ghost"} onClick={()=>setFilter("video")}>Wideo ({items.filter(x=>x.mediaType==="video").length})</button>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(150px,220px)",gap:10,marginBottom:16}}>
+      <input aria-label="Szukaj w archiwum" placeholder="Szukaj tytułu, tagu, pomieszczenia…" value={search} onChange={e=>setSearch(e.target.value)} style={{minWidth:0,background:"#0f201a",border:"1px solid #ffffff22",color:"#eee",padding:12}}/>
+      <select aria-label="Filtr folderu" value={folder} onChange={e=>setFolder(e.target.value)} style={{minWidth:0,background:"#0f201a",border:"1px solid #ffffff22",color:"#eee",padding:12}}><option value="all">Wszystkie foldery</option>{folders.map(f=><option key={f} value={f}>{f}</option>)}</select>
+    </div>
+    {visible.length ? <><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(145px,1fr))",gap:12}}>{visible.map((item:any,i:number)=><div key={item.id || (page*pageSize+i)} style={{minWidth:0}}>{item.mediaType === "video" ? <video src={item.url} controls preload="none" style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#111"}}/> : <a href={item.url} target="_blank" rel="noreferrer"><img src={item.url} loading="lazy" alt={item.title || "Zdjęcie nieruchomości"} style={{width:"100%",aspectRatio:"4/3",objectFit:"cover",borderRadius:10,background:"#eee"}}/></a>}<small className="muted" style={{display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.title || item.folder || "Materiał"}</small><small className="muted" style={{display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.roomZone || item.category || ""}</small></div>)}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginTop:18}}><button className="ghost" disabled={page===0} onClick={()=>setPage(p=>Math.max(0,p-1))}>Poprzednia</button><small className="muted">Strona {page+1} z {pageCount} · {filtered.length} wyników</small><button className="ghost" disabled={page+1>=pageCount} onClick={()=>setPage(p=>Math.min(pageCount-1,p+1))}>Następna</button></div></> : <div className="placeholder-visual"><Images size={30}/><b>{items.length ? "Brak wyników" : "Archiwum czeka na import"}</b><span>{items.length ? "Zmień frazę wyszukiwania lub wybierz inny folder." : "Przejdź do Studio sprzedawcy i zaimportuj kopię JSON."}</span></div>}
   </div>;
 }
 
